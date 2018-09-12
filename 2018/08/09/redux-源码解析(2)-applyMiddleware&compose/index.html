@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang=zh>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="讲到redux中间件就涉及好多知识了, 如函数的柯里化、store的强化器enhancer、compose归并方法,这里不讲函数的柯里化. enhancer enhancer是一个高阶函数.顾名思义,它用来增加或者修改store的功能, 在createStore中只有短短的几行代码涉及到它.  先来看看它的函数签名,它接收createStore函数,返回一个参数为reducer和preloaded">
+<meta name="keywords" content="redux">
+<meta property="og:type" content="article">
+<meta property="og:title" content="redux-源码解析(2)-applyMiddleware&amp;compose">
+<meta property="og:url" content="https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&compose/index.html">
+<meta property="og:site_name" content="boydxu&#39;s blog">
+<meta property="og:description" content="讲到redux中间件就涉及好多知识了, 如函数的柯里化、store的强化器enhancer、compose归并方法,这里不讲函数的柯里化. enhancer enhancer是一个高阶函数.顾名思义,它用来增加或者修改store的功能, 在createStore中只有短短的几行代码涉及到它.  先来看看它的函数签名,它接收createStore函数,返回一个参数为reducer和preloaded">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:image" content="https://boydxu.github.io/images/Snipaste_2018-08-08_18-08-31.png">
+<meta property="og:updated_time" content="2018-09-12T14:08:15.021Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="redux-源码解析(2)-applyMiddleware&amp;compose">
+<meta name="twitter:description" content="讲到redux中间件就涉及好多知识了, 如函数的柯里化、store的强化器enhancer、compose归并方法,这里不讲函数的柯里化. enhancer enhancer是一个高阶函数.顾名思义,它用来增加或者修改store的功能, 在createStore中只有短短的几行代码涉及到它.  先来看看它的函数签名,它接收createStore函数,返回一个参数为reducer和preloaded">
+<meta name="twitter:image" content="https://boydxu.github.io/images/Snipaste_2018-08-08_18-08-31.png">
+    
+    
+        
+          
+              <link rel="shortcut icon" href="/images/favicon.ico">
+          
+        
+        
+          
+            <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+          
+        
+        
+          
+            <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+          
+        
+    
+    <!-- title -->
+    <title>redux-源码解析(2)-applyMiddleware&amp;compose</title>
+    <!-- styles -->
+    <link rel="stylesheet" href="/css/style.css">
+    <!-- persian styles -->
+    
+      <link rel="stylesheet" href="/css/rtl.css">
+    
+    <!-- rss -->
+    
+    
+</head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+          <li><a href="/">首页</a></li>
+         
+          <li><a href="/archives/">归档</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li><a class="icon" href="/2018/09/12/redux-源码解析(3)-bindActionCreators&combineReducers/"><i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i></a></li>
+        
+        
+        <li><a class="icon" href="/2018/07/25/redux-源码解析(1)-createStore/"><i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">上一篇</span>
+      <span id="i-next" class="info" style="display:none;">下一篇</span>
+      <span id="i-top" class="info" style="display:none;">返回顶部</span>
+      <span id="i-share" class="info" style="display:none;">分享文章</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&text=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&title=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&is_video=false&description=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=redux-源码解析(2)-applyMiddleware&amp;compose&body=Check out this article: https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&title=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&title=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&title=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&title=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&name=redux-源码解析(2)-applyMiddleware&amp;compose&description="><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#enhancer"><span class="toc-number">1.</span> <span class="toc-text">enhancer</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#middleware中间件"><span class="toc-number">2.</span> <span class="toc-text">middleware中间件</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#applyMiddleware"><span class="toc-number">3.</span> <span class="toc-text">applyMiddleware</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#compose"><span class="toc-number">4.</span> <span class="toc-text">compose</span></a></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index my4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        redux-源码解析(2)-applyMiddleware&amp;compose
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">boydxu's blog</span>
+      </span>
+      
+    <div class="postdate">
+        <time datetime="2018-08-09T13:29:49.000Z" itemprop="datePublished">2018-08-09</time>
+    </div>
+
+
+      
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/redux/">redux</a>
+    </div>
+
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <p>讲到redux中间件就涉及好多知识了, 如函数的柯里化、<code>store</code>的强化器<code>enhancer</code>、<code>compose</code>归并方法,这里不讲函数的柯里化.</p>
+<h2 id="enhancer"><a href="#enhancer" class="headerlink" title="enhancer"></a>enhancer</h2><blockquote>
+<p><code>enhancer</code>是一个高阶函数.顾名思义,它用来增加或者修改store的功能, 在<code>createStore</code>中只有短短的几行代码涉及到它.</p>
+</blockquote>
+<p>先来看看它的函数签名,它接收<code>createStore</code>函数,返回一个参数为<code>reducer</code>和<code>preloadedState</code>的函数</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">enhancer</span>(<span class="params">createStore</span>) </span>&#123;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span><span class="function">(<span class="params">reducer, preloadedState</span>) =&gt;</span> &#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">  	<span class="comment">// 创建一个store</span></span><br><span class="line">   	<span class="comment">// 对store进行修改</span></span><br><span class="line">  	<span class="comment">// ...</span></span><br><span class="line">    <span class="comment">// 返回store</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>看到这里,你需要知道它大概的样子就好.</p>
+<p>来个实际的场景,我们需要对每次发送的<code>action</code>进行输出log.在理解<code>enhancer</code>前,你可以会这么处理,在每个<code>reducer</code>中添加代码,对<code>action</code>输出</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> reducer = <span class="function">(<span class="params">state = <span class="number">0</span>, action</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="built_in">console</span>.log(action)</span><br><span class="line">  <span class="keyword">switch</span> (action.type) &#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">'increment'</span>:</span><br><span class="line">      <span class="keyword">return</span> state + <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">'decrement'</span>:</span><br><span class="line">      <span class="keyword">return</span> state - <span class="number">1</span></span><br><span class="line">    <span class="keyword">default</span>:</span><br><span class="line">      <span class="keyword">return</span> state</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>简单粗暴的解决方法,但如果<code>reducer</code>有很多个,那么我们需要对所有的<code>reducer</code>添加这段代码,容易遗漏, 当我们不需要这段输出的时候,那么我们又要从多个<code>reducer</code>中删除这段代码,给后期的维护提高了难度.</p>
+<p>这个时候该<code>enhancer</code>出场了,<code>reducer</code>是在<code>dispatch</code>中被调用的,那么我们修改<code>dispatch</code>函数就完美地解决了这个问题,来看看代码.</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> enhancer = <span class="function">(<span class="params">createStore</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="function">(<span class="params">reducer, preloadedState</span>) =&gt;</span> &#123;</span><br><span class="line">    <span class="comment">// 使用原createStore创建store</span></span><br><span class="line">    <span class="keyword">const</span> store = createStore(reducer, preloadedState)</span><br><span class="line">    <span class="comment">// 保存原dispatch的引用</span></span><br><span class="line">    <span class="keyword">let</span> dispatch = store.dispatch</span><br><span class="line">    <span class="comment">// 修改store的dispatch方法</span></span><br><span class="line">    store.dispatch = <span class="function">(<span class="params">action</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="built_in">console</span>.log(action);</span><br><span class="line">      <span class="comment">// 调用原dispatch方法</span></span><br><span class="line">      dispatch(action)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> store</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>思考:如果继续增加逻辑,计算每次dispatch执行的时间以及输出dispatch执行前的state和dispatch执行后的state.</p>
+</blockquote>
+<p>继续看代码</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> enhancer = <span class="function">(<span class="params">createStore</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="function">(<span class="params">reducer, preloadedState</span>) =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">const</span> store = createStore(reducer, preloadedState)</span><br><span class="line">    <span class="keyword">let</span> dispatch = store.dispatch</span><br><span class="line">    store.dispatch = <span class="function">(<span class="params">action</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="built_in">console</span>.log(action)</span><br><span class="line">      <span class="built_in">console</span>.log(store.getState())</span><br><span class="line">      <span class="built_in">console</span>.log(<span class="keyword">new</span> <span class="built_in">Date</span>())</span><br><span class="line">      dispatch(action)</span><br><span class="line">      <span class="built_in">console</span>.log(<span class="keyword">new</span> <span class="built_in">Date</span>())</span><br><span class="line">      <span class="built_in">console</span>.log(store.getState())</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> store</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>还好我们只是增加了一些简单的代码,假设如果是一些很复杂的代码,各种逻辑的代码混杂的一起,后期代码维护工作的难度还是不小的.</p>
+<p>同时思考如果其中部分的代码需要给其他项目复用呢?总不能老是copy代码吧.这时候该中间件出场了</p>
+</blockquote>
+<h2 id="middleware中间件"><a href="#middleware中间件" class="headerlink" title="middleware中间件"></a>middleware中间件</h2><p>每个<code>middleware</code>是个独立的高阶函数. <code>middleware</code>中间件简单的理解就是在<code>dispatch(action)</code>前后添加自己的代码.middleware类似洋葱圈模型. </p>
+<p><img src="/images/Snipaste_2018-08-08_18-08-31.png" alt="Snipaste_2018-08-08_18-08-31"></p>
+<p>通过图可以看出,store.dispatch(经过封装的dispatch)后,代码执行路径是mid1 -&gt; mid2 -&gt; mid3 -&gt; dispatch(原store.dispatch) -&gt; mid3 -&gt; mid2 -&gt; mid1.</p>
+<h2 id="applyMiddleware"><a href="#applyMiddleware" class="headerlink" title="applyMiddleware"></a>applyMiddleware</h2><p><code>applyMiddleware</code>函数的本质是创建一个<code>enhancer</code>,它传入多个中间件函数,在返回的<code>enhancer</code>中一层层地将原store.dispatch嵌套.</p>
+<p>先看看中间件的函数签名,函数签名比较复杂,内部有2层的函数嵌套.</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 按照层次,依次参数为</span></span><br><span class="line"><span class="comment">// 1. store对象,</span></span><br><span class="line"><span class="comment">// 2.下一个中间件的最内层函数或者是原store.dispatch,</span></span><br><span class="line"><span class="comment">// 3. 上一层中间件返回的action对象,或者是最外层调用store.dispatch函数的参数action</span></span><br><span class="line"><span class="keyword">const</span> middleware = <span class="function"><span class="params">store</span> =&gt;</span> next =&gt; <span class="function"><span class="params">action</span> =&gt;</span> &#123;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>来看看上面讲到的三个需求用中间件的实现代码.</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 在执行dispatch前输出action</span></span><br><span class="line"><span class="keyword">const</span> actionLogMiddleware = <span class="function"><span class="params">store</span> =&gt;</span> next =&gt; <span class="function"><span class="params">action</span> =&gt;</span> &#123;</span><br><span class="line">  <span class="built_in">console</span>.log(action)</span><br><span class="line">  <span class="keyword">let</span> r = next(action)</span><br><span class="line">  <span class="keyword">return</span> r</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 在执行dispatch前后输出state</span></span><br><span class="line"><span class="keyword">const</span> stateLogMiddleware = <span class="function"><span class="params">store</span> =&gt;</span> next =&gt; <span class="function"><span class="params">action</span> =&gt;</span> &#123;</span><br><span class="line">  <span class="built_in">console</span>.log(store.getState())</span><br><span class="line">  <span class="keyword">let</span> r = next(action)</span><br><span class="line">  <span class="built_in">console</span>.log(store.getState())</span><br><span class="line">  <span class="keyword">return</span> r</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 输出dispatch的执行时间</span></span><br><span class="line"><span class="keyword">const</span> timeLogMiddleware = <span class="function"><span class="params">store</span> =&gt;</span> next =&gt; <span class="function"><span class="params">action</span> =&gt;</span> &#123;</span><br><span class="line">  <span class="built_in">console</span>.log(<span class="string">'timeStart'</span>,<span class="keyword">new</span> <span class="built_in">Date</span>())</span><br><span class="line">  <span class="keyword">let</span> r = next(action)</span><br><span class="line">  <span class="built_in">console</span>.log(<span class="string">'timeEnd'</span>,<span class="keyword">new</span> <span class="built_in">Date</span>())</span><br><span class="line">  <span class="keyword">return</span> r</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">const</span> reducer = <span class="function">(<span class="params">state = <span class="number">0</span>, action</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="built_in">console</span>.log(<span class="string">'exec reducer'</span>)</span><br><span class="line">  <span class="keyword">if</span>(action.type === <span class="string">'add'</span>)&#123;</span><br><span class="line">    <span class="keyword">return</span> state + <span class="number">1</span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> state</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 我刚才说过applyMiddleware函数的本质是创建一个enhancer</span></span><br><span class="line"><span class="keyword">const</span> enhancer = applyMiddleware(actionLogMiddleware, stateLogMiddleware, timeLogMiddleware)</span><br><span class="line"><span class="keyword">let</span> store = createStore(reducer, enhancer)</span><br><span class="line">store.dispatch(&#123; <span class="attr">type</span>: <span class="string">'add'</span> &#125;)</span><br><span class="line"><span class="comment">// 各中间件依次输出</span></span><br><span class="line"><span class="comment">// actionLogMiddleware:    &#123; type: 'add' &#125;</span></span><br><span class="line"><span class="comment">// stateLogMiddleware:     0</span></span><br><span class="line"><span class="comment">// timeLogMiddleware:      timeStart xxxx</span></span><br><span class="line"><span class="comment">// reducer:                exec reducer</span></span><br><span class="line"><span class="comment">// timeLogMiddleware: 	   timeEnd xxxx</span></span><br><span class="line"><span class="comment">// stateLogMiddleware: 	   1</span></span><br></pre></td></tr></table></figure>
+<p>来看看<code>applyMiddleware</code>是怎么实现这点的</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">applyMiddleware</span>(<span class="params">...middlewares</span>) </span>&#123; <span class="comment">// middlewares = [mid1, mid2, mid3]</span></span><br><span class="line">  <span class="keyword">return</span> <span class="function"><span class="params">createStore</span> =&gt;</span> (...args) =&gt; &#123;</span><br><span class="line">    <span class="comment">// 创建原store</span></span><br><span class="line">    <span class="keyword">const</span> store = createStore(...args)</span><br><span class="line">    <span class="comment">// 在Dispatching中添加中间件会报一下错误,但是在store还未创建,dispatch怎么会执行?这点不太明白</span></span><br><span class="line">    <span class="keyword">let</span> dispatch = <span class="function"><span class="params">()</span> =&gt;</span> &#123;</span><br><span class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> <span class="built_in">Error</span>(</span><br><span class="line">        <span class="string">`Dispatching while constructing your middleware is not allowed. `</span> +</span><br><span class="line">        <span class="string">`Other middleware would not be applied to this dispatch.`</span></span><br><span class="line">      )</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 定义一个类store对象,包含getState函数和上面我们刚定义的dispatch函数</span></span><br><span class="line">    <span class="comment">// 不过在后面dispatch指向又变了,所以在中间件访问到的store.dispatch函数其实是封装过的dispatch</span></span><br><span class="line">    <span class="keyword">const</span> middlewareAPI = &#123;</span><br><span class="line">      getState: store.getState,</span><br><span class="line">      dispatch: <span class="function">(<span class="params">...args</span>) =&gt;</span> dispatch(...args)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 类store对象作为参数,遍历执行所有的中间件</span></span><br><span class="line">    <span class="comment">// chain是以下结构的函数构成的数组</span></span><br><span class="line">    <span class="comment">// func = (next) =&gt; action =&gt; &#123; /*在这里可以访问到类store对象*/ &#125;</span></span><br><span class="line">    <span class="keyword">const</span> chain = middlewares.map(<span class="function"><span class="params">middleware</span> =&gt;</span> middleware(middlewareAPI))</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// compose函数是一个归并方法,对chain做了一次归并操作,compose函数的解析请看下一小节</span></span><br><span class="line">    <span class="comment">// 这段代码是对原dispatch的封装</span></span><br><span class="line">    <span class="comment">// 这里可能不太好理解,先跳过,看完compose解析后再回来看这里</span></span><br><span class="line">    dispatch = compose(...chain)(store.dispatch)</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 返回原store的拷贝,并将原dispatch函数替换成封装过的dispatch函数</span></span><br><span class="line">    <span class="keyword">return</span> &#123;</span><br><span class="line">      ...store,</span><br><span class="line">      dispatch</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="compose"><a href="#compose" class="headerlink" title="compose"></a>compose</h2><p>compose是一个归并方法, 作用是将中间件的层层嵌套执行,来看看源码</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">default</span> <span class="function"><span class="keyword">function</span> <span class="title">compose</span>(<span class="params">...funcs</span>) </span>&#123;</span><br><span class="line">  <span class="comment">// 没有参数时直接返回 arg =&gt; arg </span></span><br><span class="line">  <span class="keyword">if</span> (funcs.length === <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="function"><span class="params">arg</span> =&gt;</span> arg</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 只有一个参数时,直接返回参数</span></span><br><span class="line">  <span class="keyword">if</span> (funcs.length === <span class="number">1</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> funcs[<span class="number">0</span>]</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 对参数归并执行,看下一段代码,了解它的作用</span></span><br><span class="line">  <span class="keyword">return</span> funcs.reduce(<span class="function">(<span class="params">a, b</span>) =&gt;</span> (...args) =&gt; a(b(...args)))</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> func1 = <span class="function">(<span class="params">a</span>) =&gt;</span> &#123; <span class="comment">/**/</span> &#125;</span><br><span class="line"><span class="keyword">const</span> func2 = <span class="function">(<span class="params">a</span>) =&gt;</span> &#123; <span class="comment">/**/</span> &#125;</span><br><span class="line"><span class="keyword">const</span> func3 = <span class="function">(<span class="params">a</span>) =&gt;</span> &#123; <span class="comment">/**/</span> &#125;</span><br><span class="line"><span class="keyword">const</span> chain = [func1, func2, func3]</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> func4 = compose(...chain)</span><br><span class="line"><span class="comment">// 最后hunc4是这个样子</span></span><br><span class="line"><span class="comment">// func4 = (args) =&gt; func1(func2(func3(args)))</span></span><br></pre></td></tr></table></figure>
+<p>到这里,你需要模糊地明白compose做了哪些事情就好了,最后拿一个例子做一次关键代码的执行解析</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> mid1 = <span class="function"><span class="params">store1</span> =&gt;</span> next1 =&gt; <span class="function"><span class="params">action1</span> =&gt;</span> &#123;</span><br><span class="line">  <span class="comment">/* do something 1 */</span></span><br><span class="line">  <span class="keyword">let</span> r1 = next1(action1)</span><br><span class="line">  <span class="comment">/* do something1 1 */</span></span><br><span class="line">  <span class="keyword">return</span> r1</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> mid2 = <span class="function"><span class="params">store2</span> =&gt;</span> next2 =&gt; <span class="function"><span class="params">action2</span> =&gt;</span> &#123;</span><br><span class="line">  <span class="comment">/* do something 2 */</span></span><br><span class="line">  <span class="keyword">let</span> r2 = next2(action2)</span><br><span class="line">  <span class="comment">/* do something 2 */</span></span><br><span class="line">  <span class="keyword">return</span> r2</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> mid3 = <span class="function"><span class="params">store3</span> =&gt;</span> next3 =&gt; <span class="function"><span class="params">action3</span> =&gt;</span> &#123;</span><br><span class="line">  <span class="comment">/* do something 3 */</span></span><br><span class="line">  <span class="keyword">let</span> r3 = next3(action3)</span><br><span class="line">  <span class="comment">/* do something 3 */</span></span><br><span class="line">  <span class="keyword">return</span> r3</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//  执行applyMiddleware(mid1,mid2)</span></span><br><span class="line">applyMiddleware(mid1, mid2, mid3)&#123;</span><br><span class="line">  <span class="keyword">const</span> middlewares = [mid1, mid2, mid3]</span><br><span class="line">  <span class="keyword">return</span> <span class="function"><span class="params">createStore</span> =&gt;</span> (reducer, preloadedState)) =&gt; &#123;</span><br><span class="line">    <span class="keyword">const</span> store = createStore(reducer, preloadedState)</span><br><span class="line">    <span class="keyword">let</span> dispatch = <span class="function"><span class="params">()</span> =&gt;</span> &#123; <span class="keyword">throw</span> <span class="keyword">new</span> <span class="built_in">Error</span>(<span class="string">'xxxx'</span>) &#125;</span><br><span class="line">    <span class="comment">// 创建类store对象</span></span><br><span class="line">    <span class="keyword">const</span> middlewareAPI = &#123;</span><br><span class="line">      getState: store.getState,</span><br><span class="line">      dispatch: <span class="function">(<span class="params">...args</span>) =&gt;</span> dispatch(...args)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">const</span> chain = middlewares.map(<span class="function"><span class="params">middleware</span> =&gt;</span> middleware(middlewareAPI))</span><br><span class="line">    <span class="comment">// 得到的chain为以下结构,但map遍历执行后都生成了一个闭包,</span></span><br><span class="line">    <span class="comment">// 所以每个函数都可以访问到middlewareAPI对象,</span></span><br><span class="line">    <span class="comment">// 注意此时middlewareAPI.dispatch还是那个抛出错误的箭头函数</span></span><br><span class="line">    chain = [</span><br><span class="line">      next1 =&gt; <span class="function"><span class="params">action1</span> =&gt;</span> &#123;</span><br><span class="line">        <span class="comment">/* do something 1 */</span></span><br><span class="line">        <span class="keyword">let</span> r1 = next1(action1)</span><br><span class="line">        <span class="comment">/* do something 1 */</span></span><br><span class="line">        <span class="keyword">return</span> r1</span><br><span class="line">      &#125;,</span><br><span class="line">      next2 =&gt; <span class="function"><span class="params">action2</span> =&gt;</span> &#123;</span><br><span class="line">        <span class="comment">/* do something 2 */</span></span><br><span class="line">        <span class="keyword">let</span> r2 = next2(action2)</span><br><span class="line">        <span class="comment">/* do something 2 */</span></span><br><span class="line">        <span class="keyword">return</span> r2</span><br><span class="line">      &#125;,</span><br><span class="line">      next3 =&gt; <span class="function"><span class="params">action3</span> =&gt;</span> &#123;</span><br><span class="line">        <span class="comment">/* do something 3 */</span></span><br><span class="line">        <span class="keyword">let</span> r3 = next3(action3)</span><br><span class="line">        <span class="comment">/* do something 3 */</span></span><br><span class="line">        <span class="keyword">return</span> r3</span><br><span class="line">      &#125;</span><br><span class="line">    ]</span><br><span class="line"></span><br><span class="line">    dispatch = compose(...chain)(store.dispatch)</span><br><span class="line">    <span class="comment">// compose(...chain)执行结果类似以下结构</span></span><br><span class="line">    <span class="comment">// 注意,每个next函数同样都是通过闭包的形式去访问的,而不是下面代码这样,但整体结构类似</span></span><br><span class="line">    <span class="keyword">let</span> preDispatch = <span class="function">(<span class="params">next3</span>) =&gt;</span> (action1) =&gt; &#123;</span><br><span class="line">      <span class="comment">/* do something 1 */</span></span><br><span class="line">      <span class="keyword">let</span> next1 = <span class="function">(<span class="params">action2</span>) =&gt;</span> &#123;</span><br><span class="line">        <span class="comment">/* do something 2 */</span></span><br><span class="line">        <span class="keyword">let</span> next2 = <span class="function">(<span class="params">action3</span>) =&gt;</span> &#123;</span><br><span class="line">          <span class="comment">/* do something 3 */</span></span><br><span class="line">          <span class="keyword">let</span> r3 = next3(action3)</span><br><span class="line">          <span class="comment">/* do something 3 */</span></span><br><span class="line">          <span class="keyword">return</span> r3</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">let</span> r2 = next2(action2)</span><br><span class="line">        <span class="comment">/* do something 2 */</span></span><br><span class="line">        <span class="keyword">return</span> r2</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">let</span> r1 = next1(action1)</span><br><span class="line">      <span class="comment">/* do something 1 */</span></span><br><span class="line">      <span class="keyword">return</span> r1</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 最后传入原sotre.dispatch执行得到封装过的dispatch函数</span></span><br><span class="line">    <span class="comment">// dispatch = preDispatch(sotre.dispatch)</span></span><br><span class="line">    <span class="comment">// 注意,此时dispatch的指针改变了,上面middlewareAPI.dispatch也就指向了封装过的dispatch</span></span><br><span class="line">    <span class="comment">// 所以每个中间件是可以调用封装过的dispatch函数的</span></span><br><span class="line">    <span class="comment">// 最后得到的dispatch是这样的</span></span><br><span class="line">    dispatch = <span class="function">(<span class="params">action1</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="comment">/* do something 1 */</span></span><br><span class="line">      <span class="keyword">let</span> next1 = <span class="function">(<span class="params">action2</span>) =&gt;</span> &#123;</span><br><span class="line">        <span class="comment">/* do something 2 */</span></span><br><span class="line">        <span class="keyword">let</span> next2 = <span class="function">(<span class="params">action3</span>) =&gt;</span> &#123;</span><br><span class="line">          <span class="comment">/* do something 3 */</span></span><br><span class="line">          <span class="comment">// 执行原store.dispatch</span></span><br><span class="line">          <span class="keyword">let</span> r3 = store.dispatch(action3)</span><br><span class="line">          <span class="comment">/* do something 3 */</span></span><br><span class="line">          <span class="keyword">return</span> r3</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">let</span> r2 = next2(action2)</span><br><span class="line">        <span class="comment">/* do something 2 */</span></span><br><span class="line">        <span class="keyword">return</span> r2</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">let</span> r1 = next1(action1)</span><br><span class="line">      <span class="comment">/* do something 1 */</span></span><br><span class="line">      <span class="keyword">return</span> r1</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 返回原store的拷贝,并将原dispatch函数替换成封装过的dispatch函数</span></span><br><span class="line">    <span class="keyword">return</span> &#123;</span><br><span class="line">      ...store,</span><br><span class="line">      dispatch</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>到此,applyMiddleware源码解析完成 . 要想更好了解redux,还是推荐自己写一遍简单的用例,一步步调试,输出关键数据才能透彻地了解redux的执行机制.</p>
+
+  </div>
+</article>
+
+
+
+    </div>
+    
+      <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">首页</a></li>
+         
+          <li><a href="/archives/">归档</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#enhancer"><span class="toc-number">1.</span> <span class="toc-text">enhancer</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#middleware中间件"><span class="toc-number">2.</span> <span class="toc-text">middleware中间件</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#applyMiddleware"><span class="toc-number">3.</span> <span class="toc-text">applyMiddleware</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#compose"><span class="toc-number">4.</span> <span class="toc-text">compose</span></a></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&text=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&title=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&is_video=false&description=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=redux-源码解析(2)-applyMiddleware&amp;compose&body=Check out this article: https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&title=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&title=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&title=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&title=redux-源码解析(2)-applyMiddleware&amp;compose"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=https://boydxu.github.io/2018/08/09/redux-源码解析(2)-applyMiddleware&amp;compose/&name=redux-源码解析(2)-applyMiddleware&amp;compose&description="><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> 菜单</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> 目录</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> 返回顶部</a>
+    </div>
+
+  </div>
+</div>
+
+    
+    <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy; 2018 boydxu
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+          <li><a href="/">首页</a></li>
+         
+          <li><a href="/archives/">归档</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>
+<!-- styles -->
+<link rel="stylesheet" href="/lib/font-awesome/css/fontawesome-all.min.css">
+<link rel="stylesheet" href="/lib/justified-gallery/css/justifiedGallery.min.css">
+
+<!-- jquery -->
+<script src="/lib/jquery/jquery.min.js"></script>
+<script src="/lib/justified-gallery/js/jquery.justifiedGallery.min.js"></script>
+<script src="/js/main.js"></script>
+<!-- search -->
+
+<!-- Google Analytics -->
+
+<!-- Baidu Analytics -->
+
+<!-- Disqus Comments -->
+
+
